@@ -16,11 +16,11 @@ from workspace_config import WORKSPACE, is_reserved_path
 import solidworks_query_server as query
 from solidworks_mcp.com import compat
 from solidworks_mcp.util import result as R
+from document_policy import DocumentPolicy
 
 upstream = query.upstream
 CAD_ROOT = (WORKSPACE / "CAD").resolve()
 LOCK = threading.RLock()
-MANAGED = []  # (IUnknown identity, writable); only accessed on the COM STA thread.
 
 mcp = FastMCP(
     "solidworks",
@@ -43,22 +43,11 @@ def _identity(doc):
     return doc._oleobj_.QueryInterface(pythoncom.IID_IUnknown)
 
 
-def _remember(writable):
-    doc = upstream.SESSION.active_doc()
-    MANAGED.append((_identity(doc), writable))
+POLICY = DocumentPolicy(upstream.SESSION, _identity)
 
 
 def _require_managed(writable=True):
-    doc = upstream.SESSION.active_doc()
-    identity = _identity(doc)
-    for known, can_write in MANAGED:
-        if known == identity and (can_write or not writable):
-            return doc
-    raise R.ToolError(
-        "DOCUMENT_NOT_OWNED",
-        "The active document was not created by this modeling server session.",
-        hint="Create a new part with new_document. Existing user documents are query-only.",
-    )
+    return POLICY.require_active(writable)
 
 
 def _checked_path(file_path, *, must_exist):
@@ -112,8 +101,6 @@ def new_document(template_path: str | None = None) -> str:
             if template_path and Path(template_path).suffix.lower() != ".prtdot":
                 raise ValueError("A part template must have the .prtdot extension.")
             response = upstream.new_document(doc_type="part", template_path=template_path)
-            if json.loads(response).get("ok"):
-                upstream.SESSION.com.call(_remember, True)
             return response
         except Exception as exc:
             return R.from_exception("new_document", exc)
@@ -143,8 +130,6 @@ def open_document(file_path: str) -> str:
         try:
             source = _checked_path(file_path, must_exist=True)
             response = upstream.open_document(file_path=source, read_only=True)
-            if json.loads(response).get("ok"):
-                upstream.SESSION.com.call(_remember, False)
             return response
         except Exception as exc:
             return R.from_exception("open_document", exc)
@@ -164,12 +149,10 @@ def close_document() -> str:
                     raise ValueError("Save changes to a new file before closing this document.")
                 return _identity(doc)
 
-            identity = upstream.SESSION.com.call(check_saved)
+            upstream.SESSION.com.call(check_saved)
             response = upstream.close_document(save=False, close_all=False)
             if json.loads(response).get("ok"):
-                def forget():
-                    MANAGED[:] = [(known, writable) for known, writable in MANAGED if known != identity]
-                upstream.SESSION.com.call(forget)
+                upstream.SESSION.com.call(POLICY.forget_closed)
             return response
         except Exception as exc:
             return R.from_exception("close_document", exc)
@@ -197,7 +180,7 @@ def add_sketch_dimension(point: Any, value: float, label_offset: Any = None,
                 upstream.SESSION.com.call(parametric_plate_tools.restore_dimension_input, upstream.SESSION, token)
 
 
-parametric_plate_tools.register(mcp, upstream, _require_managed, _remember, LOCK)
+parametric_plate_tools.register(mcp, upstream, _require_managed, LOCK)
 
 
 if __name__ == "__main__":

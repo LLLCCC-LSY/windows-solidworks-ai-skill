@@ -120,6 +120,10 @@ def new_document(
         time.sleep(0.5)
         title = pm(doc, "GetTitle", default=None)
 
+    callback = getattr(session, "on_new_document", None)
+    if callback is not None:
+        callback(doc)
+
     return {
         "template": template,
         "document": title,
@@ -221,6 +225,10 @@ def open_document(
         activate_errors = byref_int()
         pm(session.app, "ActivateDoc3", title, False, enums.ACTIVATE_DONT_REBUILD,
            activate_errors, default=None)
+
+    callback = getattr(session, "on_open_document", None)
+    if callback is not None:
+        callback(doc)
 
     return {
         "document": title,

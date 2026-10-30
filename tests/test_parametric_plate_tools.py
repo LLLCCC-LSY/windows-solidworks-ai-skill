@@ -53,7 +53,37 @@ def test_disabled_equation_engine_is_rejected_before_creating_a_document(monkeyp
                 return function
             return register
 
-    tools.register(Server(), object(), None, None, threading.RLock())
+    tools.register(Server(), object(), None, threading.RLock())
     response = json.loads(registered["create_parametric_plate"](use_equations=True))
     assert not response["ok"]
     assert response["error"]["details"]["stage"] == "validate_parameters"
+
+
+def test_preference_readback_failure_before_token_restores_original(monkeypatch):
+    class App:
+        value = True
+        reads = 0
+
+        def GetUserPreferenceToggle(self, index):
+            self.reads += 1
+            if self.reads == 2:
+                raise RuntimeError("readback failed")
+            return self.value
+
+        def SetUserPreferenceToggle(self, index, value):
+            self.value = value
+
+    monkeypatch.setattr(tools.constants, "table", lambda: {"swInputDimValOnCreate":10})
+    session = SimpleNamespace(app=App())
+    with pytest.raises(RuntimeError, match="readback failed"):
+        tools.suspend_dimension_input(session)
+    assert session.app.value is True
+
+
+def test_unknown_preference_does_not_modify_user_settings(monkeypatch):
+    from unittest.mock import Mock
+    app = SimpleNamespace(GetUserPreferenceToggle=lambda _: None, SetUserPreferenceToggle=Mock())
+    monkeypatch.setattr(tools.constants, "table", lambda: {"swInputDimValOnCreate":10})
+    with pytest.raises(RuntimeError):
+        tools.suspend_dimension_input(SimpleNamespace(app=app))
+    app.SetUserPreferenceToggle.assert_not_called()

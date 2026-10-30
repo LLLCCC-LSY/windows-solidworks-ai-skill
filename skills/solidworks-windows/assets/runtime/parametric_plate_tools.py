@@ -16,6 +16,13 @@ PARAMETER_NAMES = ("L", "W", "T", "D", "E")
 NATIVE_PLATES = []  # (IUnknown identity, native dimension bindings); STA thread only.
 
 
+def _dimension_preference(session, index):
+    value = session.app.GetUserPreferenceToggle(index)
+    if value is None or value not in (False, True, -1):
+        raise RuntimeError("Could not read the dimension-input preference.")
+    return bool(value)
+
+
 def validate_parameters(length_mm, width_mm, thickness_mm, hole_diameter_mm, edge_distance_mm):
     values = dict(zip(PARAMETER_NAMES, map(float, (length_mm, width_mm, thickness_mm, hole_diameter_mm, edge_distance_mm))))
     if not all(math.isfinite(value) and value > 0 for value in values.values()):
@@ -31,17 +38,22 @@ def suspend_dimension_input(session):
     index = constants.table().get("swInputDimValOnCreate")
     if index is None:
         raise RuntimeError("Cannot verify the native dimension-input preference constant.")
-    original = bool(session.app.GetUserPreferenceToggle(index))
-    session.app.SetUserPreferenceToggle(index, False)
-    if session.app.GetUserPreferenceToggle(index):
-        raise RuntimeError("Could not suppress the dimension-input dialog.")
+    original = _dimension_preference(session, index)
+    try:
+        session.app.SetUserPreferenceToggle(index, False)
+        if _dimension_preference(session, index):
+            raise RuntimeError("Could not suppress the dimension-input dialog.")
+    except BaseException:
+        # The caller has no token yet: restore here if setting/readback fails.
+        restore_dimension_input(session, (index, original))
+        raise
     return index, original
 
 
 def restore_dimension_input(session, token):
     index, original = token
     session.app.SetUserPreferenceToggle(index, original)
-    if bool(session.app.GetUserPreferenceToggle(index)) != original:
+    if _dimension_preference(session, index) != original:
         raise RuntimeError("The original dimension-input preference could not be restored.")
 
 
@@ -184,7 +196,14 @@ def link_thickness(session, feature_name, use_equations=True):
     return short_name
 
 
-def register(mcp, upstream, require_managed, remember, lock):
+def _owned_call(session, operation, function, *args):
+    def run():
+        with session.operation_scope(operation):
+            return function(*args)
+    return session.com.call(run)
+
+
+def register(mcp, upstream, require_managed, lock):
     @mcp.tool()
     def create_parametric_plate(length_mm: float = 120, width_mm: float = 80,
                                 thickness_mm: float = 10, hole_diameter_mm: float = 8,
@@ -213,7 +232,6 @@ def register(mcp, upstream, require_managed, remember, lock):
 
                 stage = "new_document"
                 checked(stage, {})
-                upstream.SESSION.com.call(remember, True)
                 stage = "create_sketch"
                 checked(stage, {"plane": "Front Plane", "unit": "mm"})
                 stage = "add_sketch_entities"
@@ -223,11 +241,11 @@ def register(mcp, upstream, require_managed, remember, lock):
                     entities.append({"entity_type": "circle", "cx": x, "cy": y, "radius": params["D"]/2})
                 checked(stage, {"entities": entities, "unit": "mm"})
                 stage = "define_plate_sketch"
-                defined = upstream.SESSION.com.call(define_plate_sketch, upstream.SESSION, params, use_equations)
+                defined = _owned_call(upstream.SESSION, "define_plate_sketch", define_plate_sketch, upstream.SESSION, params, use_equations)
                 stage = "extrude_feature"
                 boss = checked(stage, {"feature_type": "boss", "depth": params["T"], "unit": "mm"})
                 stage = "link_thickness"
-                thickness_name = upstream.SESSION.com.call(link_thickness, upstream.SESSION, boss["feature"], use_equations)
+                thickness_name = _owned_call(upstream.SESSION, "link_thickness", link_thickness, upstream.SESSION, boss["feature"], use_equations)
                 defined["native_dimension_bindings"]["T"] = [thickness_name]
                 if not use_equations:
                     def remember_native():

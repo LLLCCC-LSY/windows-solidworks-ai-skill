@@ -61,7 +61,9 @@ python -m venv .venv
 & .\.venv\Scripts\python.exe -m pytest tests skills/solidworks-windows/assets/vendor/solidworks-mcp/tests -q
 ```
 
-本次本地 155 项测试通过，并在带空格路径的新工作区完成部署与 3/19 工具握手。
+本次本地 176 项测试通过，并在带空格路径的新工作区完成部署与 3/19 工具握手。
+
+本轮审查修复了文档归属与活动窗口切换、尺寸输入偏好恢复、带引号 TOML 配置更新、诊断退出码、Windows 保留路径和已有虚拟环境校验。详见 [审查记录](REVIEW.md)。
 
 离线测试和协议握手不需要启动 SolidWorks。真实 CAD 验收按 [建模说明](skills/solidworks-windows/references/modeling.md) 执行；本仓库未包含用户模型或运行日志。
 

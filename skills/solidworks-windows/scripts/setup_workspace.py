@@ -46,6 +46,27 @@ def prepare(workspace, mode="query", sw_exe=None):
     return output
 
 
+def check_existing_environment(workspace):
+    root = Path(workspace).resolve()
+    environment = root / ".venv"
+    if not environment.exists():
+        return
+    if not environment.resolve().is_relative_to(root):
+        raise ValueError("The existing .venv points outside the selected workspace.")
+    executable = environment / "Scripts/python.exe"
+    if not executable.is_file():
+        if any(environment.iterdir()):
+            raise FileExistsError("Existing .venv is incomplete; use a new workspace or repair it explicitly.")
+        return
+    code = "import json,struct,sys;print(json.dumps({'version':list(sys.version_info[:2]),'bits':struct.calcsize('P')*8,'prefix':sys.prefix,'is_venv':sys.prefix!=sys.base_prefix}))"
+    completed = subprocess.run([str(executable), "-I", "-c", code], capture_output=True, text=True, check=True)
+    info = json.loads(completed.stdout)
+    if tuple(info["version"]) < (3, 12) or info["bits"] != 64:
+        raise ValueError("Existing .venv must use 64-bit Python 3.12 or later.")
+    if not info["is_venv"] or Path(info["prefix"]).resolve() != environment.resolve():
+        raise ValueError("The interpreter does not belong to the selected workspace's .venv.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", required=True, type=Path)
@@ -71,11 +92,14 @@ def main():
         parser.error("Run this helper with 64-bit Python 3.12 or later.")
     # Validate the optional executable before copying files.
     render(root, args.mode, args.sw_exe)
+    if args.install:
+        check_existing_environment(root)
     output = prepare(root, args.mode, args.sw_exe)
     if args.install:
         executable = root / ".venv/Scripts/python.exe"
         if not executable.exists():
             venv.EnvBuilder(with_pip=True).create(root / ".venv")
+        check_existing_environment(root)
         subprocess.run([str(executable), "-m", "pip", "install", "-e", str(root / "vendor/solidworks-mcp"), "mcp==1.30.0", "pywin32==312"], check=True)
         subprocess.run([str(executable), "-m", "pip", "check"], check=True)
     print(f"Prepared {output}. Review it, then use configure_mcp.py to apply the entry.")

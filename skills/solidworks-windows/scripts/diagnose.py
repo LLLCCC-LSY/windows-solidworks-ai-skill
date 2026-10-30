@@ -15,7 +15,7 @@ def probe():
               "connected": False, "dependencies": {}}
     for module in ("pythoncom", "win32com", "mcp"):
         report["dependencies"][module] = importlib.util.find_spec(module) is not None
-    if sys.platform != "win32" or not report["dependencies"]["pythoncom"]:
+    if sys.platform != "win32" or not all(report["dependencies"][name] for name in ("pythoncom", "win32com")):
         return report
     import pythoncom
     import win32com.client
@@ -46,16 +46,17 @@ def main():
     parser.add_argument("--workspace", type=Path)
     parser.add_argument("--save-report", action="store_true")
     args = parser.parse_args()
+    if args.save_report and args.workspace is None:
+        parser.error("--save-report requires --workspace.")
     result = probe()
     text = json.dumps(result, ensure_ascii=False, indent=2)
     print(text)
     if args.save_report:
-        if args.workspace is None:
-            parser.error("--save-report requires --workspace.")
         report_dir = args.workspace / "Reports"
         report_dir.mkdir(parents=True, exist_ok=True)
         (report_dir / "solidworks-diagnosis.json").write_text(text + "\n", encoding="utf-8")
+    return 0 if result["connected"] else 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

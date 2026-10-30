@@ -21,10 +21,15 @@ python "$skillDir\scripts\setup_workspace.py" --workspace C:\AI-Workspace --dry-
 
 ```powershell
 python "$skillDir\scripts\setup_workspace.py" --workspace C:\AI-Workspace --install
+# 手动打开 SolidWorks 后运行诊断
 & C:\AI-Workspace\.venv\Scripts\python.exe "$skillDir\scripts\diagnose.py" --workspace C:\AI-Workspace --save-report
 ```
 
 脚本创建 `CAD/Scripts/Reports/Backups`，复制可移植服务与固定快照的上游源码，在独立 `.venv` 中安装依赖。依赖固定 MCP SDK 1.30.0、pywin32 312；升级后重验，不跨大版本盲目更新。
+
+诊断成功返回退出码 0；缺少依赖、COM 连接失败或 SolidWorks 未运行时返回非零退出码，不会自动启动 SolidWorks。
+
+已有 `.venv` 必须是当前工作区内有效的 64 位 Python 3.12+ 虚拟环境；校验失败时停止，不向该环境安装依赖。
 
 已有同名源码内容不同会被拒绝。更换工作区或审查差异后手动更新；不要覆盖现有部署来完成一次教程。
 

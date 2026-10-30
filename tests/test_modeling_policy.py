@@ -27,12 +27,12 @@ def test_existing_file_is_not_overwritten(tmp_path, monkeypatch):
 
 def test_unmanaged_and_readonly_documents_cannot_be_mutated(monkeypatch):
     doc = object()
-    monkeypatch.setattr(server.upstream.SESSION, "active_doc", lambda: doc)
-    monkeypatch.setattr(server, "_identity", lambda _: 123)
-    monkeypatch.setattr(server, "MANAGED", [])
+    monkeypatch.setattr(server.POLICY, "_active_doc", lambda: doc)
+    monkeypatch.setattr(server.POLICY, "identity", lambda _: 123)
+    monkeypatch.setattr(server.POLICY, "records", [])
     with pytest.raises(server.R.ToolError):
         server._require_managed()
-    server.MANAGED.append((123, False))
+    server.POLICY.records.append((123, False))
     assert server._require_managed(writable=False) is doc
     with pytest.raises(server.R.ToolError):
         server._require_managed(writable=True)

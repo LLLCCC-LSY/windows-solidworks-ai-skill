@@ -130,6 +130,10 @@ def tool(operation: str, *, needs_connection: bool = True) -> Callable:
                     SESSION.ensure()
 
                 def run() -> tuple[str, dict]:
+                    scope = getattr(SESSION, "operation_scope", None)
+                    if scope is not None:
+                        with scope(operation):
+                            return func(*args, **kwargs)
                     return func(*args, **kwargs)
 
                 message, data = SESSION.com.call(run)
