@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Runtime artefacts
+*.log
+src/solidworks_mcp/solidworks_mcp.json
+src/solidworks_mcp/*.log
+
+# Reference material, not part of the package
+reference-projects/

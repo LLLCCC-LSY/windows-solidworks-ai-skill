@@ -1,0 +1,23 @@
+# 上游与本地修正
+
+随附源码来自 [AvishakeAdhikary/solidworks-mcp-server](https://github.com/AvishakeAdhikary/solidworks-mcp-server)，固定基础提交：
+
+`b730c29313f7958d0ae05dd851ec413ee9485fd6`
+
+源码位于 `assets/vendor/solidworks-mcp`，保留原始 [MIT License](../assets/vendor/solidworks-mcp/LICENSE)。本技能新增代码另按技能目录的 `LICENSE.txt` 授权。
+
+与上游基础提交相比的修正：
+
+- 限制 MCP SDK 为 1.x。
+- 只用运行对象表连接；关闭自动启动时工具参数不能覆盖配置。
+- 连接默认保留尺寸输入偏好；标注时单独临时切换并恢复。
+- 能力探测只解析 DISPID，避免执行被探测的方法。
+- 修正草图约束枚举、API 数量统计和原生尺寸遍历。
+- 受限入口提供 3 工具查询模式及 19 工具建模模式，控制工作区、防覆盖和文档归属。
+- 原生尺寸安装板配方及数值参数检查。
+
+上游完整包包含更多接口，但受限入口没有暴露宏、任意代码、删除、装配、工程图或导出工具。不要把上游 README 的兼容性和全工具测试声明当成此发布的现场验证结论。
+
+初始 CAD 实测：2026-10-30，一台 Windows 机器，SolidWorks 2023 SP0.1、Python 3.14.7、pywin32 312、MCP SDK 1.30.0。已验证完全定义安装板、单尺寸关联变更、五输入更新、保存重开及防护。全局变量方程存在未解决的本机 VBA 故障。
+
+更新供应源码或依赖后，应重跑离线测试、协议握手和实际 CAD 验收；不要覆盖现有用户部署来测试升级。

@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "solidworks-mcp"
+version = "1.0.0"
+description = "MCP server for SolidWorks 2018-2026 via pure-Python COM automation"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["solidworks", "mcp", "cad", "com", "automation"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: Manufacturing",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+]
+
+dependencies = [
+    "mcp>=1.2.0,<2",
+    "pywin32>=306; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+solidworks-mcp = "solidworks_mcp.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Offline tests import the pure-Python layers only; anything needing live COM is
+# marked and skipped automatically off Windows.
+markers = ["requires_solidworks: needs a running SolidWorks installation"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = [
+    # Broad excepts and bare re-raises are intentional throughout the COM layer: a
+    # late-bound call can fail in a dozen unrelated ways depending on the SolidWorks
+    # build, and the compatibility strategy is to fall through to the next candidate
+    # rather than chain a meaningless COM traceback.
+    "B904",
+    "SIM105",
+    # Explicit if/else beats a ternary where the branches encode a SolidWorks
+    # behavioural difference worth commenting individually.
+    "SIM108",
+    # `ProgramData` is the real casing Windows uses; forcing uppercase is wrong here.
+    "SIM112",
+    # zip() over polyline point runs is intentionally pairwise-truncating.
+    "B905",
+]

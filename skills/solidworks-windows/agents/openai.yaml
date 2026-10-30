@@ -1,0 +1,4 @@
+interface:
+  display_name: "SolidWorks 自动建模工作台"
+  short_description: "Set up and validate Windows SolidWorks MCP modeling workflows"
+  default_prompt: "使用 $solidworks-windows 检查我的 Windows CAD 环境，并生成经过尺寸和保存重开验证的零件。"
